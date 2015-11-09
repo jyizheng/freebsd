@@ -686,6 +686,7 @@ vm_phys_init(void)
 			KASSERT(flind >= 0,
 			    ("vm_phys_init: DEFAULT flind < 0"));
 		}
+		/* YZJ: initial the queue for segment */
 		seg->free_queues = &vm_phys_free_queues[seg->domain][flind];
 	}
 
@@ -743,10 +744,10 @@ vm_phys_add_page(vm_paddr_t pa)
 	KASSERT(m->order == VM_NFREEORDER,
 	    ("vm_phys_add_page: page %p has unexpected order %d",
 	    m, m->order));
-	m->pool = VM_FREEPOOL_DEFAULT;
+	m->pool = VM_FREEPOOL_DEFAULT; /* YZJ: the default pool a page belongs to */
 	pmap_page_init(m);
 	mtx_lock(&vm_page_queue_free_mtx);
-	vm_phys_freecnt_adj(m, 1);
+	vm_phys_freecnt_adj(m, 1); /* YZJ: adjust the free count of vm and domain */
 	vm_phys_free_pages(m, 0);
 	mtx_unlock(&vm_page_queue_free_mtx);
 }
@@ -821,7 +822,7 @@ vm_phys_alloc_freelist_pages(int freelist, int pool, int order)
 
 static vm_page_t
 vm_phys_alloc_domain_pages(int domain, int flind, int pool, int order)
-{	
+{
 	struct vm_freelist *fl;
 	struct vm_freelist *alt;
 	int oind, pind;
@@ -832,7 +833,7 @@ vm_phys_alloc_domain_pages(int domain, int flind, int pool, int order)
 	for (oind = order; oind < VM_NFREEORDER; oind++) {
 		m = TAILQ_FIRST(&fl[oind].pl);
 		if (m != NULL) {
-			vm_freelist_rem(fl, m, oind);
+			vm_freelist_rem(fl, m, oind); /* YZJ: remove from free list */
 			vm_phys_split_pages(m, oind, fl, order);
 			return (m);
 		}
@@ -844,6 +845,9 @@ vm_phys_alloc_domain_pages(int domain, int flind, int pool, int order)
 	 * pool.  Transfer these pages to the given pool, and
 	 * use them to satisfy the allocation.
 	 */
+
+	/* YZJ: This is a good feature */
+
 	for (oind = VM_NFREEORDER - 1; oind >= order; oind--) {
 		for (pind = 0; pind < VM_NFREEPOOL; pind++) {
 			alt = &vm_phys_free_queues[domain][flind][pind][0];
